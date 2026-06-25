@@ -2,6 +2,7 @@
 
 import { MessageEvent } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 const signalLabels: Record<string, string> = {
   sentiment_drift: 'Sentiment Drift',
@@ -12,6 +13,12 @@ const signalLabels: Record<string, string> = {
 
 interface MessageEvidenceCardProps {
   message: MessageEvent
+}
+
+function getSentimentBorderClass(score: number) {
+  if (score > 0.2) return 'border-l-green-500'
+  if (score >= -0.2) return 'border-l-amber-500'
+  return 'border-l-red-500'
 }
 
 export function MessageEvidenceCard({ message }: MessageEvidenceCardProps) {
@@ -40,7 +47,12 @@ export function MessageEvidenceCard({ message }: MessageEvidenceCardProps) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div
+      className={cn(
+        'rounded-lg border border-border border-l-4 bg-card p-4',
+        getSentimentBorderClass(message.sentimentScore)
+      )}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">

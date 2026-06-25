@@ -7,8 +7,10 @@ import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CheckCircle2, AlertCircle } from 'lucide-react'
+import { useWorkspace } from '@/lib/hooks/use-workspace'
 
 export default function SettingsPage() {
+  const { workspaceName, slackConnected } = useWorkspace()
   const [emailAlerts, setEmailAlerts] = useState(true)
   const [slackAlerts, setSlackAlerts] = useState(true)
   const [weeklyReport, setWeeklyReport] = useState(false)
@@ -27,7 +29,6 @@ export default function SettingsPage() {
         <p className="text-muted-foreground">Manage workspace configuration and preferences</p>
       </div>
 
-      {/* Slack Integration Card */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -47,13 +48,17 @@ export default function SettingsPage() {
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Status</p>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-600" />
-                  <p className="text-sm font-medium text-foreground">Connected</p>
+                  <div
+                    className={`w-2 h-2 rounded-full ${slackConnected ? 'bg-green-600' : 'bg-amber-500'}`}
+                  />
+                  <p className="text-sm font-medium text-foreground">
+                    {slackConnected ? 'Connected' : 'Not configured'}
+                  </p>
                 </div>
               </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Workspace</p>
-                <p className="text-sm font-medium text-foreground">Demo Corp</p>
+                <p className="text-sm font-medium text-foreground">{workspaceName}</p>
               </div>
             </div>
 
@@ -71,7 +76,6 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
-      {/* Notification Preferences */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -115,7 +119,6 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
-      {/* Risk Thresholds */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -131,7 +134,6 @@ export default function SettingsPage() {
             <CardDescription>Adjust the scores that trigger different alert levels</CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
-            {/* Warning Threshold */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -155,7 +157,6 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground mt-2">Default: 5.0</p>
             </div>
 
-            {/* Critical Threshold */}
             <div className="border-t border-border pt-8">
               <div className="flex items-center justify-between mb-4">
                 <div>

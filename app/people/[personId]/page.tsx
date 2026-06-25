@@ -1,16 +1,39 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import useSWR from 'swr'
+import { AlertTriangle, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { RiskScoreRing } from '@/components/people/RiskScoreRing'
 import { SignalBreakdown } from '@/components/people/SignalBreakdown'
 import { RelationshipCard } from '@/components/people/RelationshipCard'
 import { MessageEvidenceCard } from '@/components/people/MessageEvidenceCard'
-import { mockPeople, mockRiskScoreBreakdown, mockRelationships, mockMessages } from '@/lib/mock-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import type { Person, Relationship, MessageEvent, RiskScoreBreakdown } from '@/lib/types'
+import { formatRelativeTime } from '@/lib/utils/time'
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+const timelineVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.1 },
+  },
+}
+
+const timelineItemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+}
+
+interface PersonDetailResponse {
+  person: Person
+  breakdown: RiskScoreBreakdown
+  relationships: (Relationship & { partnerName: string })[]
+  messages: MessageEvent[]
+}
 
 interface PageProps {
   params: Promise<{ personId: string }>
@@ -20,27 +43,46 @@ export default function PeopleProfilePage({ params }: PageProps) {
   const resolvedParams = use(params)
   const [activeTab, setActiveTab] = useState('signals')
 
-  const person = mockPeople.find((p) => p.id === resolvedParams.personId)
-  if (!person) {
+  const { data, isLoading, error } = useSWR<PersonDetailResponse>(
+    `/api/dashboard/people/${resolvedParams.personId}`,
+    fetcher
+  )
+
+  const sortedMessages = useMemo(() => {
+    if (!data?.messages) return []
+    return [...data.messages].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )
+  }, [data?.messages])
+
+  if (isLoading) {
+    return (
+      <main className="ml-64 pt-24 px-8 pb-12">
+        <p className="text-muted-foreground">Loading profile...</p>
+      </main>
+    )
+  }
+
+  if (error || !data?.person) {
     return (
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="ml-64 pt-24 px-8 pb-12"
       >
-        <Link href="/dashboard">
-          <div className="flex items-center gap-2 text-accent hover:underline mb-6">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm font-medium">Back</span>
-          </div>
-        </Link>
+        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+          <Link href="/dashboard" className="hover:text-foreground transition-colors">
+            Dashboard
+          </Link>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground">Not found</span>
+        </nav>
         <p className="text-foreground">Person not found</p>
       </motion.main>
     )
   }
 
-  const personRelationships = mockRelationships.filter((r) => r.actorId === person.id)
-  const personMessages = mockMessages.filter((m) => m.senderId === person.id)
+  const { person, breakdown, relationships } = data
 
   const getRiskLevelColor = (level: string) => {
     switch (level) {
@@ -55,6 +97,21 @@ export default function PeopleProfilePage({ params }: PageProps) {
     }
   }
 
+  const signalLabel = (signal: string) => {
+    switch (signal) {
+      case 'sentiment_drift':
+        return 'Sentiment Drift Detected'
+      case 'after_hours':
+        return 'After-Hours Activity'
+      case 'channel_exclusion':
+        return 'Channel Exclusion Pattern'
+      case 'response_drop':
+        return 'Response Rate Drop'
+      default:
+        return signal
+    }
+  }
+
   return (
     <motion.main
       initial={{ opacity: 0 }}
@@ -62,27 +119,24 @@ export default function PeopleProfilePage({ params }: PageProps) {
       transition={{ duration: 0.3 }}
       className="ml-64 pt-24 px-8 pb-12"
     >
-      {/* Back Button */}
-      <Link href="/dashboard">
-        <div className="flex items-center gap-2 text-accent hover:underline mb-6 w-fit">
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back to Dashboard</span>
-        </div>
-      </Link>
+      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
+        <Link href="/dashboard" className="hover:text-accent transition-colors font-medium">
+          Dashboard
+        </Link>
+        <ChevronRight className="h-4 w-4 shrink-0" />
+        <span className="text-foreground font-medium">{person.name}</span>
+      </nav>
 
-      {/* Main Layout - Two Columns */}
       <div className="grid grid-cols-5 gap-8">
-        {/* Left Column - 40% */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3 }}
           className="col-span-2 space-y-6"
         >
-          {/* Person Header */}
           <div className="rounded-lg border border-border bg-card p-6">
             <div className="flex items-start gap-4 mb-6">
-              <div className={`w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-foreground`}>
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-foreground">
                 {person.name
                   .split(' ')
                   .map((n) => n[0])
@@ -97,7 +151,6 @@ export default function PeopleProfilePage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* Risk Score Ring */}
             <div className="flex justify-center mb-4">
               <RiskScoreRing score={person.riskScore} />
             </div>
@@ -107,46 +160,48 @@ export default function PeopleProfilePage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Signal Breakdown */}
           <div className="rounded-lg border border-border bg-card p-6">
             <h3 className="text-sm font-semibold text-foreground mb-4">Risk Score Breakdown</h3>
-            <SignalBreakdown breakdown={mockRiskScoreBreakdown} />
+            <SignalBreakdown breakdown={breakdown} />
           </div>
 
-          {/* Signal Timeline */}
           <div className="rounded-lg border border-border bg-card p-6">
             <h3 className="text-sm font-semibold text-foreground mb-4">Signal Timeline</h3>
-            <div className="space-y-3">
-              {person.signals.length > 0 ? (
-                person.signals.map((signal, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full bg-accent mt-2 flex-shrink-0" />
+            {person.signals.length > 0 ? (
+              <motion.div
+                className="space-y-3"
+                variants={timelineVariants}
+                initial="hidden"
+                animate="show"
+              >
+                {person.signals.map((signal) => (
+                  <motion.div
+                    key={signal}
+                    variants={timelineItemVariants}
+                    className="flex items-start gap-3"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-accent mt-2 shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {signal === 'sentiment_drift' && 'Sentiment Drift Detected'}
-                        {signal === 'after_hours' && 'After-Hours Activity'}
-                        {signal === 'channel_exclusion' && 'Channel Exclusion Pattern'}
-                        {signal === 'response_drop' && 'Response Rate Drop'}
+                      <p className="text-sm font-medium text-foreground">{signalLabel(signal)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelativeTime(person.lastActivity)}
                       </p>
-                      <p className="text-xs text-muted-foreground">3 days ago</p>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">No signals triggered</p>
-              )}
-            </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No signals triggered</p>
+            )}
           </div>
         </motion.div>
 
-        {/* Right Column - 60% */}
         <motion.div
           initial={{ opacity: 0, x: 10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
           className="col-span-3"
         >
-          {/* Tabs */}
           <Tabs defaultValue="signals" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="w-full mb-6">
               <TabsTrigger value="signals" className="flex-1">
@@ -157,25 +212,21 @@ export default function PeopleProfilePage({ params }: PageProps) {
               </TabsTrigger>
             </TabsList>
 
-            {/* Risk Signals Tab */}
             <TabsContent value="signals" className="space-y-4">
-              {personRelationships.length > 0 ? (
-                personRelationships.map((relationship) => {
-                  const partner = mockPeople.find((p) => p.id === relationship.targetId)
-                  return (
-                    <motion.div
-                      key={relationship.targetId}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <RelationshipCard
-                        relationship={relationship}
-                        partnerName={partner?.name || 'Unknown'}
-                      />
-                    </motion.div>
-                  )
-                })
+              {relationships.length > 0 ? (
+                relationships.map((relationship) => (
+                  <motion.div
+                    key={relationship.targetId}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <RelationshipCard
+                      relationship={relationship}
+                      partnerName={relationship.partnerName}
+                    />
+                  </motion.div>
+                ))
               ) : (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                   <p className="text-muted-foreground">No relationships with risk signals</p>
@@ -183,25 +234,22 @@ export default function PeopleProfilePage({ params }: PageProps) {
               )}
             </TabsContent>
 
-            {/* Message Evidence Tab */}
             <TabsContent value="evidence" className="space-y-4">
-              {/* Restricted Access Banner */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
                 className="rounded-lg bg-yellow-50 border border-yellow-200 p-4 flex gap-3"
               >
-                <AlertTriangle className="w-5 h-5 text-yellow-700 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-yellow-700 shrink-0 mt-0.5" />
                 <p className="text-sm text-yellow-800">
-                  <span className="font-semibold">Restricted View:</span> This view is restricted to HR and
-                  Legal roles. Message content is only accessible in this evidence view.
+                  <span className="font-semibold">Restricted View:</span> This view is restricted to HR
+                  and Legal roles. Message content is only accessible in this evidence view.
                 </p>
               </motion.div>
 
-              {/* Messages */}
-              {personMessages.length > 0 ? (
-                personMessages.map((message, idx) => (
+              {sortedMessages.length > 0 ? (
+                sortedMessages.map((message, idx) => (
                   <motion.div
                     key={message.eventId}
                     initial={{ opacity: 0, y: 10 }}

@@ -1,5 +1,7 @@
 'use client'
 
+import { motion } from 'framer-motion'
+
 interface RiskScoreRingProps {
   score: number
   size?: number
@@ -9,27 +11,26 @@ interface RiskScoreRingProps {
 export function RiskScoreRing({ score, size = 180, strokeWidth = 8 }: RiskScoreRingProps) {
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const offset = circumference - (score / 10) * circumference
+  const targetOffset = circumference - (score / 10) * circumference
 
-  const getColor = (score: number) => {
-    if (score >= 7.5) return '#E85D24'
-    if (score >= 5) return '#F59E0B'
-    if (score >= 3) return '#3B82F6'
+  const getColor = (value: number) => {
+    if (value >= 7.5) return '#E85D24'
+    if (value >= 5) return '#F59E0B'
+    if (value >= 3) return '#3B82F6'
     return '#10B981'
   }
 
-  const getForeground = (score: number) => {
-    if (score >= 7.5) return '#E85D24'
-    if (score >= 5) return '#D97706'
-    if (score >= 3) return '#2563EB'
+  const getForeground = (value: number) => {
+    if (value >= 7.5) return '#E85D24'
+    if (value >= 5) return '#D97706'
+    if (value >= 3) return '#2563EB'
     return '#059669'
   }
 
   return (
     <div className="flex flex-col items-center">
-      <div style={{ position: 'relative', width: size, height: size }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          {/* Background circle */}
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -38,40 +39,25 @@ export function RiskScoreRing({ score, size = 180, strokeWidth = 8 }: RiskScoreR
             stroke="#E5E7EB"
             strokeWidth={strokeWidth}
           />
-          {/* Score circle */}
-          <circle
+          <motion.circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
             fill="none"
             stroke={getColor(score)}
             strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
             strokeLinecap="round"
-            style={{
-              transition: 'all 0.6s ease',
-            }}
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: targetOffset }}
+            transition={{ duration: 1, ease: 'easeOut' }}
           />
         </svg>
-        {/* Center text */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{ fontSize: 48, fontWeight: 'bold', color: getForeground(score) }}>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-5xl font-bold" style={{ color: getForeground(score) }}>
             {score.toFixed(1)}
           </span>
-          <span style={{ fontSize: 12, color: '#6B7280' }}>/10</span>
+          <span className="text-xs text-muted-foreground">/10</span>
         </div>
       </div>
     </div>

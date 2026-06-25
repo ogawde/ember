@@ -2,9 +2,11 @@
 
 import { Bell } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { useWorkspace } from '@/lib/hooks/use-workspace'
 
 export function Header() {
   const pathname = usePathname()
+  const { workspaceName } = useWorkspace()
 
   const getPageTitle = () => {
     if (pathname.startsWith('/dashboard')) return 'Dashboard'
@@ -19,7 +21,7 @@ export function Header() {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-semibold text-foreground">{getPageTitle()}</h1>
         <div className="ml-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
-          <span>Workspace: Demo Corp</span>
+          <span>Workspace: {workspaceName}</span>
         </div>
       </div>
 
