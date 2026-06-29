@@ -37,7 +37,7 @@ export default function AlertsPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="ml-64 pt-24 px-8 pb-12"
+      className="pt-24 px-8 pb-12"
     >
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-6">

@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useMemo } from 'react'
+import { use, useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import useSWR from 'swr'
 import { AlertTriangle, ChevronRight } from 'lucide-react'
@@ -11,6 +11,7 @@ import { RelationshipCard } from '@/components/people/RelationshipCard'
 import { MessageEvidenceCard } from '@/components/people/MessageEvidenceCard'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Person, Relationship, MessageEvent, RiskScoreBreakdown } from '@/lib/types'
 import { formatRelativeTime } from '@/lib/utils/time'
 
@@ -42,6 +43,7 @@ interface PageProps {
 export default function PeopleProfilePage({ params }: PageProps) {
   const resolvedParams = use(params)
   const [activeTab, setActiveTab] = useState('signals')
+  const [visibleEvidenceCount, setVisibleEvidenceCount] = useState(10)
 
   const { data, isLoading, error } = useSWR<PersonDetailResponse>(
     `/api/dashboard/people/${resolvedParams.personId}`,
@@ -55,9 +57,18 @@ export default function PeopleProfilePage({ params }: PageProps) {
     )
   }, [data?.messages])
 
+  const visibleMessages = useMemo(
+    () => sortedMessages.slice(0, visibleEvidenceCount),
+    [sortedMessages, visibleEvidenceCount]
+  )
+
+  useEffect(() => {
+    setVisibleEvidenceCount(10)
+  }, [resolvedParams.personId, sortedMessages.length])
+
   if (isLoading) {
     return (
-      <main className="ml-64 pt-24 px-8 pb-12">
+      <main className="pt-24 px-8 pb-12">
         <p className="text-muted-foreground">Loading profile...</p>
       </main>
     )
@@ -68,7 +79,7 @@ export default function PeopleProfilePage({ params }: PageProps) {
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="ml-64 pt-24 px-8 pb-12"
+        className="pt-24 px-8 pb-12"
       >
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
           <Link href="/dashboard" className="hover:text-foreground transition-colors">
@@ -117,11 +128,11 @@ export default function PeopleProfilePage({ params }: PageProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="ml-64 pt-24 px-8 pb-12"
+      className="pt-24 px-8 pb-12"
     >
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-        <Link href="/dashboard" className="hover:text-accent transition-colors font-medium">
-          Dashboard
+        <Link href="/people" className="hover:text-accent transition-colors font-medium">
+          People
         </Link>
         <ChevronRight className="h-4 w-4 shrink-0" />
         <span className="text-foreground font-medium">{person.name}</span>
@@ -249,7 +260,8 @@ export default function PeopleProfilePage({ params }: PageProps) {
               </motion.div>
 
               {sortedMessages.length > 0 ? (
-                sortedMessages.map((message, idx) => (
+                <>
+                  {visibleMessages.map((message, idx) => (
                   <motion.div
                     key={message.eventId}
                     initial={{ opacity: 0, y: 10 }}
@@ -258,7 +270,22 @@ export default function PeopleProfilePage({ params }: PageProps) {
                   >
                     <MessageEvidenceCard message={message} />
                   </motion.div>
-                ))
+                  ))}
+                  {visibleEvidenceCount < sortedMessages.length && (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          setVisibleEvidenceCount((current) =>
+                            Math.min(current + 10, sortedMessages.length)
+                          )
+                        }
+                      >
+                        View more
+                      </Button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="rounded-lg border border-border bg-card p-8 text-center">
                   <p className="text-muted-foreground">No flagged messages</p>

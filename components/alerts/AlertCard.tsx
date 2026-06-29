@@ -5,7 +5,6 @@ import { motion } from 'framer-motion'
 import { Alert } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { TrendingDown } from 'lucide-react'
 
 const signalLabels: Record<string, string> = {
   sentiment_drift: 'Sentiment Drift',
@@ -94,13 +93,6 @@ export function AlertCard({ alert }: AlertCardProps) {
               {signalLabels[signal]}
             </Badge>
           ))}
-        </div>
-      </div>
-
-      <div className="mb-4 h-12 bg-muted/20 rounded flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <TrendingDown className="w-3 h-3" />
-          <span>Mini sparkline placeholder</span>
         </div>
       </div>
 

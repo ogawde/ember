@@ -56,7 +56,12 @@ export async function getOrCreateDemoOrg() {
   return created
 }
 
-export async function getOrCreatePerson(orgId: string, slackUserId: string, name?: string) {
+export async function getOrCreatePerson(
+  orgId: string,
+  slackUserId: string,
+  name?: string,
+  department?: string
+) {
   const existing = await db.query.persons.findFirst({
     where: and(eq(persons.orgId, orgId), eq(persons.slackUserId, slackUserId)),
   })
@@ -68,7 +73,7 @@ export async function getOrCreatePerson(orgId: string, slackUserId: string, name
       orgId,
       slackUserId,
       name: name ?? `User ${slackUserId.slice(-4)}`,
-      department: 'Unknown',
+      department: department?.trim() || 'Unknown',
     })
     .returning()
 

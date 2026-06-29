@@ -22,7 +22,7 @@ export default function SettingsPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="ml-64 pt-24 px-8 pb-12 max-w-3xl"
+      className="pt-24 px-8 pb-12 max-w-3xl"
     >
       <div className="mb-12">
         <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>

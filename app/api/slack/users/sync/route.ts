@@ -9,7 +9,7 @@ interface SlackMember {
   id: string
   name?: string
   real_name?: string
-  profile?: { email?: string; display_name?: string }
+  profile?: { email?: string; display_name?: string; title?: string }
   deleted?: boolean
   is_bot?: boolean
 }
@@ -57,6 +57,8 @@ export async function GET() {
         member.name ||
         `User ${member.id.slice(-4)}`
 
+      const department = member.profile?.title?.trim() || 'Unknown'
+
       const existing = await db.query.persons.findFirst({
         where: (p, { and, eq }) =>
           and(eq(p.orgId, org.id), eq(p.slackUserId, member.id)),
@@ -68,10 +70,11 @@ export async function GET() {
           .set({
             name,
             email: member.profile?.email ?? existing.email,
+            department,
           })
           .where(eq(persons.id, existing.id))
       } else {
-        await getOrCreatePerson(org.id, member.id, name)
+        await getOrCreatePerson(org.id, member.id, name, department)
       }
       synced++
     }

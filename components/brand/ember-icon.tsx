@@ -1,0 +1,30 @@
+import { cn } from '@/lib/utils'
+
+interface EmberIconProps {
+  className?: string
+}
+
+export function EmberIcon({ className }: EmberIconProps) {
+  return (
+    <svg
+      viewBox="0 0 160 160"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={cn('shrink-0', className)}
+      aria-hidden="true"
+    >
+      <rect width="160" height="160" rx="32" fill="#1A1A1A" />
+      <circle cx="80" cy="38" r="8" fill="#555" />
+      <circle cx="44" cy="94" r="8" fill="#555" />
+      <circle cx="116" cy="94" r="8" fill="#555" />
+      <circle cx="80" cy="126" r="8" fill="#555" />
+      <line x1="80" y1="38" x2="44" y2="94" stroke="#3A3A3A" strokeWidth="1.5" />
+      <line x1="80" y1="38" x2="116" y2="94" stroke="#3A3A3A" strokeWidth="1.5" />
+      <line x1="44" y1="94" x2="80" y2="126" stroke="#3A3A3A" strokeWidth="1.5" />
+      <line x1="116" y1="94" x2="80" y2="126" stroke="#3A3A3A" strokeWidth="1.5" />
+      <line x1="44" y1="94" x2="116" y2="94" stroke="#E85D24" strokeWidth="2.5" />
+      <circle cx="44" cy="94" r="13" fill="none" stroke="#E85D24" strokeWidth="2" />
+      <circle cx="116" cy="94" r="8" fill="#E85D24" />
+    </svg>
+  )
+}

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import useSWR from 'swr'
 import type { Person, Relationship, SignalType } from '@/lib/types'
+import { useSidebar } from '@/lib/hooks/use-sidebar'
 
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false })
 
@@ -39,8 +40,10 @@ interface GraphNode {
   riskScore: number
   riskLevel: string
   signals: SignalType[]
-  x?: number
-  y?: number
+  x: number
+  y: number
+  fx: number
+  fy: number
 }
 
 interface GraphLink {
@@ -57,11 +60,13 @@ interface HoveredNode {
 
 interface ForceGraphRef {
   zoomToFit: (ms?: number, padding?: number) => void
-  d3Force: (name: string) => { strength?: (n: number) => number; distance?: (n: number) => number }
-  d3ReheatSimulation: () => void
 }
 
 const GRAPH_HEIGHT = 440
+
+function isGraphPerson(person: Person) {
+  return person.slackUserId !== 'USLACKBOT' && !person.name.startsWith('User ')
+}
 
 function getInitials(name: string) {
   return name
@@ -80,16 +85,40 @@ function screenFontSize(globalScale: number, px = 12) {
   return Math.max(10, Math.min(14, px / globalScale))
 }
 
+function buildFixedLayout(people: Person[]): GraphNode[] {
+  const count = people.length
+  const radius = Math.max(185, count * 62)
+
+  return people.map((person, index) => {
+    const angle = (2 * Math.PI * index) / count - Math.PI / 2
+    const x = Math.cos(angle) * radius
+    const y = Math.sin(angle) * radius
+
+    return {
+      id: person.id,
+      name: person.name,
+      firstName: person.name.split(' ')[0],
+      initials: getInitials(person.name),
+      riskScore: person.riskScore,
+      riskLevel: person.riskLevel,
+      signals: person.signals,
+      x,
+      y,
+      fx: x,
+      fy: y,
+    }
+  })
+}
+
 export function RiskGraph() {
   const router = useRouter()
+  const { sidebarWidth } = useSidebar()
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<ForceGraphRef | null>(null)
-  const frameRef = useRef(0)
   const mousePosRef = useRef({ x: 0, y: 0 })
   const [width, setWidth] = useState(800)
   const [hovered, setHovered] = useState<HoveredNode | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
-  const [, setAnimationTick] = useState(0)
 
   const { data: people = [] } = useSWR<Person[]>('/api/dashboard/people', fetcher, {
     refreshInterval: 30000,
@@ -100,77 +129,102 @@ export function RiskGraph() {
     { refreshInterval: 30000 }
   )
 
-  const graphData = useMemo(
-    () => ({
-      nodes: people.map((p) => ({
-        id: p.id,
-        name: p.name,
-        firstName: p.name.split(' ')[0],
-        initials: getInitials(p.name),
-        riskScore: p.riskScore,
-        riskLevel: p.riskLevel,
-        signals: p.signals,
-      })),
-      links: relationships.map((r) => ({
-        source: r.actorId,
-        target: r.targetId,
-        strength: r.interactionCount,
-      })),
-    }),
-    [people, relationships]
+  const graphPeople = useMemo(
+    () =>
+      people
+        .filter(isGraphPerson)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [people]
   )
 
+  const graphData = useMemo(() => {
+    const nodeIds = new Set(graphPeople.map((person) => person.id))
+    const nodes = buildFixedLayout(graphPeople)
+    const links = relationships
+      .filter((rel) => nodeIds.has(rel.actorId) && nodeIds.has(rel.targetId))
+      .map((rel) => ({
+        source: rel.actorId,
+        target: rel.targetId,
+        strength: rel.interactionCount,
+      }))
+
+    return { nodes, links }
+  }, [graphPeople, relationships])
+
   const maxLinkStrength = useMemo(
-    () => Math.max(...graphData.links.map((l) => l.strength), 1),
+    () => Math.max(...graphData.links.map((link) => link.strength), 1),
     [graphData.links]
   )
 
-  const hasCritical = people.some((p) => p.riskLevel === 'critical')
+  const fitGraphToView = useCallback((duration = 300) => {
+    graphRef.current?.zoomToFit(duration, 80)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+
+    const measureWidth = () => {
+      const nextWidth = Math.max(320, Math.round(el.getBoundingClientRect().width))
+      setWidth(nextWidth)
+    }
+
     const ro = new ResizeObserver(([entry]) => {
-      setWidth(entry.contentRect.width)
+      const nextWidth = Math.max(320, Math.round(entry.contentRect.width))
+      setWidth(nextWidth)
     })
+
     ro.observe(el)
-    setWidth(el.clientWidth)
+    measureWidth()
     return () => ro.disconnect()
   }, [])
 
   useEffect(() => {
-    if (graphRef.current && graphData.nodes.length > 0) {
-      const fg = graphRef.current
-      const charge = fg.d3Force('charge')
-      if (charge) charge.strength(-280)
-      const link = fg.d3Force('link')
-      if (link) link.distance(110)
-      fg.d3ReheatSimulation()
-      setTimeout(() => fg.zoomToFit(400, 48), 600)
+    const el = containerRef.current
+    if (!el) return
+
+    // Sidebar width animates over 300ms; remeasure at start + end.
+    const measure = () => {
+      setWidth(Math.max(320, Math.round(el.getBoundingClientRect().width)))
     }
-  }, [graphData.nodes.length, graphData.links.length])
+
+    measure()
+    const rafId = requestAnimationFrame(measure)
+    const timer = window.setTimeout(measure, 360)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      window.clearTimeout(timer)
+    }
+  }, [sidebarWidth])
 
   useEffect(() => {
-    if (!hasCritical) return
-    let id = 0
-    const tick = () => {
-      frameRef.current += 1
-      setAnimationTick((n) => n + 1)
-      id = requestAnimationFrame(tick)
+    if (graphData.nodes.length === 0) return
+
+    let cancelled = false
+    const runFit = () => {
+      if (!cancelled) fitGraphToView()
     }
-    id = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(id)
-  }, [hasCritical])
+
+    const timer = window.setTimeout(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(runFit)
+      })
+    }, 120)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [width, graphData.nodes.length, fitGraphToView])
 
   const drawNode = useCallback((node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    if (node.x == null || node.y == null) return
-
     const radius = getNodeRadius(node.riskScore)
     const color = RISK_COLORS[node.riskLevel] ?? RISK_COLORS.normal
     const fill = RISK_FILL[node.riskLevel] ?? RISK_FILL.normal
 
     if (node.riskLevel === 'critical') {
-      const phase = frameRef.current * 0.08
+      const phase = (performance.now() / 1000) * 8
       for (let i = 3; i >= 1; i--) {
         const pulse = 1 + 0.1 * Math.sin(phase + i * 0.6)
         ctx.beginPath()
@@ -204,7 +258,7 @@ export function RiskGraph() {
     const pillW = textW + padX * 2
     const pillH = labelSize + padY * 2
     const pillX = node.x - pillW / 2
-    const pillY = node.y + radius + 6 / globalScale
+    const pillY = node.y + radius + 8 / globalScale
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.96)'
     ctx.strokeStyle = '#CBD5E1'
@@ -232,6 +286,7 @@ export function RiskGraph() {
       setHovered(null)
       return
     }
+
     const topSignal = node.signals[0]
     setHovered({
       name: node.name,
@@ -251,7 +306,7 @@ export function RiskGraph() {
     [hovered]
   )
 
-  if (people.length === 0) {
+  if (graphPeople.length === 0) {
     return (
       <div
         id="risk-graph-container"
@@ -296,7 +351,7 @@ export function RiskGraph() {
       </div>
 
       <p className="absolute bottom-3 left-3 z-10 text-[11px] text-slate-500 bg-white/90 px-2 py-1 rounded border border-slate-200">
-        Click a node to view profile
+        Click a node to view profile · click background to reset view
       </p>
 
       {hovered && (
@@ -322,7 +377,7 @@ export function RiskGraph() {
         height={GRAPH_HEIGHT}
         backgroundColor="#F8FAFC"
         nodeRelSize={1}
-        nodeVal={(node) => getNodeRadius((node as GraphNode).riskScore)}
+        nodeVal={1}
         linkWidth={(link) => {
           const strength = (link as GraphLink).strength ?? 1
           return Math.max(1.5, Math.min(3.5, 1.5 + strength / 15))
@@ -334,8 +389,15 @@ export function RiskGraph() {
         }}
         linkDirectionalParticles={0}
         enableNodeDrag={false}
-        minZoom={0.4}
-        maxZoom={4}
+        enablePanInteraction={false}
+        enableZoomInteraction
+        minZoom={0.35}
+        maxZoom={3}
+        warmupTicks={0}
+        cooldownTicks={0}
+        d3AlphaMin={0}
+        d3AlphaDecay={1}
+        onBackgroundClick={() => fitGraphToView()}
         onNodeClick={handleNodeClick}
         onNodeHover={handleNodeHover}
         nodeCanvasObjectMode={() => 'replace'}
@@ -344,7 +406,6 @@ export function RiskGraph() {
         }}
         nodePointerAreaPaint={(node, color, ctx) => {
           const n = node as GraphNode
-          if (n.x == null || n.y == null) return
           const radius = getNodeRadius(n.riskScore)
           ctx.beginPath()
           ctx.arc(n.x, n.y, radius + 14, 0, 2 * Math.PI)
