@@ -10,19 +10,71 @@ Ember helps HR and People Ops spot workplace tension early by watching how teams
 2. **Scores** — A background worker reads new messages, runs sentiment analysis (OpenRouter with a local fallback), and combines four behavioral signals into a 0–10 risk score per person.
 3. **Surfaces** — The dashboard shows metrics, an org risk map, alerts, and per-person breakdowns. Flagged message evidence is only available on individual profile pages.
 
-## Stack (short version)
+## Risk scoring (for judges)
+
+Each Slack message is scored **-1.0 → +1.0** via OpenRouter (with a keyword fallback). Those scores feed four behavioral signals per person; a weighted blend produces a **0–10 composite risk score** and alert level.
+
+| Signal | What it catches | Weight |
+| --- | --- | --- |
+| **Sentiment drift** | Tone dropping vs the prior 3 weeks, or hostile messages directed at the person | 40% (60% when < 7 days of history) |
+| **After-hours activity** | Weekend/evening messages in the last 14 days | 20% |
+| **Channel exclusion** | Slack channels the person stopped posting in (last 30 days vs prior month) | 25% |
+| **Response drop** | Message volume down 50%+ vs their 30-day baseline | 15% |
+
+| Composite score | Level | Dashboard meaning |
+| --- | --- | --- |
+| 0.0 – 2.9 | Normal | Healthy baseline |
+| 3.0 – 4.9 | Watch | Early signal — monitor |
+| 5.0 – 7.4 | Warning | Multiple indicators firing |
+| 7.5 – 10.0 | Critical | Escalate to HR |
+
+Implementation: `lib/scoring/` (sentiment, signals, composite).
 
 
-| Piece                    | Role                                  |
-| ------------------------ | ------------------------------------- |
-| **Next.js 16** on Vercel | App, API routes, landing page         |
-| **DynamoDB**             | Raw Slack messages (intake buffer)    |
-| **Aurora PostgreSQL**    | People, relationships, scores, alerts |
-| **OpenRouter**           | Sentiment scoring per message         |
-| **Slack Events API**     | Real-time message ingestion           |
 
+## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for a fuller diagram.
+![Ember system architecture](assets/diagram-export-6-29-2026-5_38_33-PM.png)
+
+<details>
+<summary><strong>How it works, API routes &amp; stack</strong></summary>
+
+### How it works
+
+| Step | What happens |
+| --- | --- |
+| **1. Ingest** | Slack sends message events to `/api/slack/events`. Raw messages are stored in DynamoDB with `processed: false`. |
+| **2. Score** | Cron calls `/api/worker/score`. The worker reads unprocessed messages, sends each to **OpenRouter LLM** for sentiment scoring (`lib/scoring/sentiment.ts`), combines that with rule-based signals, writes results to PostgreSQL, then marks DynamoDB messages processed. |
+| **3. Sync** | `/api/slack/users/sync` pulls Slack profiles (name, email, title → department) into PostgreSQL `persons`. |
+| **4. Dashboard** | HR opens the React dashboard. APIs read PostgreSQL for metrics, people, and alerts. Person detail pages also read flagged message evidence from DynamoDB. |
+
+### API routes
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/slack/events` | Receive Slack Events API payloads |
+| `GET /api/slack/users/sync` | Sync Slack users → PostgreSQL persons |
+| `GET /api/worker/score` | Cron-triggered scoring (protected by `CRON_SECRET`) |
+| `GET /api/worker/trigger` | Manual scoring trigger |
+| `GET /api/dashboard/metrics` | Dashboard headline stats |
+| `GET /api/dashboard/people` | Employee list + risk scores |
+| `GET /api/dashboard/people/[id]` | Person detail + message evidence |
+| `GET /api/dashboard/alerts` | Active alerts |
+| `GET /api/dashboard/relationships` | Relationship graph data |
+
+### Stack
+
+| Layer | Tech |
+| --- | --- |
+| Frontend | Next.js 16, React, SWR, Tailwind, shadcn/ui |
+| API | Next.js Route Handlers on Vercel |
+| Raw events | AWS DynamoDB |
+| Structured data | Aurora PostgreSQL + Drizzle ORM |
+| Source | Slack Events API + users.list |
+| Scheduler | Vercel Cron (daily) or cron-job.org (5 min) |
+| AI / LLM | OpenRouter (`OPENROUTER_API_KEY`) — sentiment per message |
+
+</details>
 
 ## Prerequisites
 
@@ -38,7 +90,6 @@ See [docs/architecture.md](docs/architecture.md) for a fuller diagram.
 cp .env.example .env.local   # fill in values
 npm install
 npm run db:migrate           # needs DATABASE_URL
-npm run db:seed              # optional demo data
 npm run dev
 ```
 
@@ -98,20 +149,6 @@ In development (or production with `?demo=true`), a small ⚡ button in the bott
 ```
 GET https://YOUR_DOMAIN/api/worker/score?secret=YOUR_CRON_SECRET
 ```
-
-Full production checklist: [docs/deployment-checklist.md](docs/deployment-checklist.md).
-
-## API routes
-
-
-| Route                       | Purpose                                |
-| --------------------------- | -------------------------------------- |
-| `POST /api/slack/events`    | Slack webhook                          |
-| `GET /api/slack/users/sync` | Sync Slack users → Postgres            |
-| `GET /api/worker/score`     | Cron scoring worker (auth required)    |
-| `GET /api/worker/trigger`   | Manual scoring trigger (auth required) |
-| `GET /api/dashboard/*`      | Metrics, people, alerts, relationships |
-
 
 ## Deploy to Vercel
 

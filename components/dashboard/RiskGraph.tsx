@@ -157,7 +157,7 @@ export function RiskGraph() {
   )
 
   const fitGraphToView = useCallback((duration = 300) => {
-    graphRef.current?.zoomToFit(duration, 80)
+    graphRef.current?.zoomToFit(duration, 200)
   }, [])
 
   useEffect(() => {
@@ -313,7 +313,7 @@ export function RiskGraph() {
         className="w-full h-[440px] border-2 border-dashed border-border rounded-lg bg-slate-50 flex items-center justify-center"
       >
         <p className="text-muted-foreground text-sm">
-          No people data yet. Run seed or sync Slack users
+          No people data yet. Sync Slack users with GET /api/slack/users/sync
         </p>
       </div>
     )
@@ -377,7 +377,10 @@ export function RiskGraph() {
         height={GRAPH_HEIGHT}
         backgroundColor="#F8FAFC"
         nodeRelSize={1}
-        nodeVal={1}
+        nodeVal={(node) => {
+          const r = getNodeRadius((node as GraphNode).riskScore) + 24
+          return r * r
+        }}
         linkWidth={(link) => {
           const strength = (link as GraphLink).strength ?? 1
           return Math.max(1.5, Math.min(3.5, 1.5 + strength / 15))
