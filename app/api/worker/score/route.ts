@@ -1,7 +1,18 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { processEventsBatch } from '@/lib/worker/process-events'
 
-export async function GET() {
+function isAuthorized(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET
+  const auth = req.headers.get('authorization')
+  const querySecret = req.nextUrl.searchParams.get('secret')
+  return Boolean(secret && (auth === `Bearer ${secret}` || querySecret === secret))
+}
+
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const result = await processEventsBatch(50)
     return NextResponse.json(result)
@@ -11,6 +22,6 @@ export async function GET() {
   }
 }
 
-export async function POST() {
-  return GET()
+export async function POST(req: NextRequest) {
+  return GET(req)
 }

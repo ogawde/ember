@@ -313,7 +313,7 @@ export function RiskGraph() {
         className="w-full h-[440px] border-2 border-dashed border-border rounded-lg bg-slate-50 flex items-center justify-center"
       >
         <p className="text-muted-foreground text-sm">
-          No people data yet — run seed or sync Slack users
+          No people data yet. Run seed or sync Slack users
         </p>
       </div>
     )

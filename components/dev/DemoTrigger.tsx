@@ -33,7 +33,7 @@ export function DemoTrigger() {
         throw new Error(data.error ?? `Request failed (${res.status})`)
       }
 
-      toast.success(`Scoring complete — ${data.processed ?? 0} events processed`)
+      toast.success(`Scoring complete: ${data.processed ?? 0} events processed`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Scoring failed')
     } finally {
@@ -44,12 +44,15 @@ export function DemoTrigger() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <Button
+        type="button"
+        size="icon"
         onClick={handleTrigger}
         disabled={loading}
-        className="shadow-lg gap-2 bg-[#E85D24] hover:bg-[#d4521f] text-white"
+        title="Trigger scoring"
+        aria-label="Trigger scoring"
+        className="shadow-lg bg-[#E85D24] hover:bg-[#d4521f] text-white"
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span>⚡</span>}
-        ⚡ Trigger Scoring
+        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <span aria-hidden>⚡</span>}
       </Button>
     </div>
   )

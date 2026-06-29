@@ -1,3 +1,5 @@
+import { getAppUrl } from '@/lib/utils'
+
 async function scoreWithOpenRouter(text: string): Promise<number> {
   const model = process.env.OPENROUTER_MODEL ?? 'openrouter/auto'
 
@@ -6,7 +8,7 @@ async function scoreWithOpenRouter(text: string): Promise<number> {
     headers: {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://ember-app.vercel.app',
+      'HTTP-Referer': getAppUrl(),
       'X-Title': 'Ember Risk Monitor',
     },
     body: JSON.stringify({

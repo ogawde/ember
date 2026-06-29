@@ -235,6 +235,7 @@ export default function PeopleProfilePage({ params }: PageProps) {
                     <RelationshipCard
                       relationship={relationship}
                       partnerName={relationship.partnerName}
+                      partnerId={relationship.targetId}
                     />
                   </motion.div>
                 ))
